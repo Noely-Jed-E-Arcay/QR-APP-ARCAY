@@ -89,7 +89,7 @@ export default function LoginScreen() {
                 secureTextEntry
                 editable={!loading}
               />
-              <Text style={styles.label}></Text>
+
               {error && <Text style={styles.error}>{error}</Text>}
 
               {loading ? (

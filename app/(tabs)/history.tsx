@@ -16,6 +16,7 @@ export default function HistoryScreen() {
   const { user } = useAuth();
 
   const loadHistory = useCallback(() => {
+    const studentId = user?.id ?? 'unknown';
     setLoading(true);
     getCurrentStudentId().then((id) => {
       if (!id) {
@@ -23,7 +24,6 @@ export default function HistoryScreen() {
         setLoading(false);
         return;
       }
-      const studentId = user?.id ?? 'unknown';
       getAttendanceHistory(studentId).then((rows) => {
         setRecords(rows);
         setLoading(false);
