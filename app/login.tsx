@@ -1,95 +1,159 @@
-// ============================================================================
-// IMPORTS
-// ============================================================================
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import {
-  FlatList,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Link, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import AppButton from '@/components/AppButton';
 import Header from '@/components/Header';
 import { COLORS } from '@/constants/colors';
-import {
-  createStudent,
-  getAllStudents,
-  setCurrentStudent,
-  type Student,
-} from '@/lib/database';
+import { signIn } from '@/lib/auth';
 
-// ============================================================================
-// STYLES
-// ============================================================================
+export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const { data, error: authError } = await signIn(email.trim(), password);
+
+      if (authError) {
+        setError(authError.message);
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Unexpected error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.headerContainer}>
+              <Header title="QR Attendance" />
+            </View>
+
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Sign in to record your attendance</Text>
+
+            <View style={styles.form}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="your.email@school.edu"
+                placeholderTextColor={COLORS.textSecondary}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                placeholderTextColor={COLORS.textSecondary}
+                secureTextEntry
+                editable={!loading}
+              />
+              <Text style={styles.label}></Text>
+              {error && <Text style={styles.error}>{error}</Text>}
+
+              {loading ? (
+                <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+              ) : (
+                <AppButton
+                  theme="primary"
+                  title="Sign In"
+                  icon="log-in-outline"
+                  onPress={handleLogin}
+                />
+              )}
+            </View>
+
+            <Link href="/register" style={styles.link}>
+              Don't have an account? Sign Up
+            </Link>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  // Container Styles
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 24,
   },
-
-  // Header Styles
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 16,
+  },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     color: COLORS.textPrimary,
+    textAlign: 'center',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
     color: COLORS.textSecondary,
-    lineHeight: 20,
-    marginBottom: 16,
+    textAlign: 'center',
+    marginBottom: 32,
   },
-
-  // List Styles
-  list: {
-    flexGrow: 0,
-  },
-  studentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-  },
-  studentRowPressed: {
-    backgroundColor: COLORS.surface,
-  },
-  studentText: {
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  studentName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  studentId: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-
-  // Form Styles
-  newStudentBox: {
-    marginTop: 8,
+  form: {
+    marginBottom: 24,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.textPrimary,
     marginBottom: 6,
+    marginTop: 10,
   },
   input: {
     backgroundColor: COLORS.card,
@@ -100,120 +164,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: COLORS.textPrimary,
-    marginBottom: 12,
   },
-  message: {
+  error: {
     fontSize: 14,
     color: '#C62828',
     textAlign: 'center',
-    marginBottom: 8,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  loader: {
+    marginVertical: 16,
+  },
+  link: {
+    fontSize: 14,
+    color: COLORS.primary,
+    textAlign: 'center',
+    fontWeight: '600',
   },
 });
-
-// ============================================================================
-// COMPONENT
-// ============================================================================
-export default function LoginScreen() {
-  // ---------- State
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [newName, setNewName] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-
-  // ---------- Effects & Callbacks
-  const loadStudents = useCallback(() => {
-    setLoading(true);
-    getAllStudents().then((rows) => {
-      setStudents(rows);
-      setLoading(false);
-    });
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadStudents();
-    }, [loadStudents])
-  );
-
-  // ---------- Event Handlers
-  const continueAs = (student: Student) => {
-    setCurrentStudent(student.studentId).then(() => {
-      router.replace('/');
-    });
-  };
-
-  const handleAddStudent = () => {
-    const name = newName.trim();
-    if (!name) {
-      setMessage('Enter your name to continue.');
-      return;
-    }
-    setMessage(null);
-    createStudent(name).then((student) => continueAs(student));
-  };
-
-  // ---------- Render
-  return (
-    <SafeAreaView style={styles.container}>
-      <Header title="QR Attendance" />
-      <Text style={styles.title}>Who&apos;s attending?</Text>
-      <Text style={styles.subtitle}>
-        Pick your name, or add a new student to get started.
-      </Text>
-
-      {loading ? (
-        <Text style={styles.subtitle}>Loading...</Text>
-      ) : (
-        <FlatList
-          data={students}
-          keyExtractor={(item) => item.studentId}
-          style={styles.list}
-          renderItem={({ item }) => (
-            <Pressable
-              style={({ pressed }) => [
-                styles.studentRow,
-                pressed && styles.studentRowPressed,
-              ]}
-              onPress={() => continueAs(item)}
-            >
-              <Ionicons
-                name="person-circle-outline"
-                size={28}
-                color={COLORS.primary}
-              />
-              <View style={styles.studentText}>
-                <Text style={styles.studentName}>{item.name}</Text>
-                <Text style={styles.studentId}>{item.studentId}</Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={COLORS.textSecondary}
-              />
-            </Pressable>
-          )}
-        />
-      )}
-
-      <View style={styles.newStudentBox}>
-        <Text style={styles.label}>New student?</Text>
-        <TextInput
-          style={styles.input}
-          value={newName}
-          onChangeText={setNewName}
-          placeholder="Enter your name"
-          placeholderTextColor={COLORS.textSecondary}
-          returnKeyType="done"
-          onSubmitEditing={handleAddStudent}
-        />
-        {message && <Text style={styles.message}>{message}</Text>}
-        <AppButton
-          theme="primary"
-          title="Continue as New Student"
-          icon="person-add-outline"
-          onPress={handleAddStudent}
-        />
-      </View>
-    </SafeAreaView>
-  );
-}

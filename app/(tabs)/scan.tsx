@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '@/constants/colors';
 import { getCurrentStudentId, registerAttendance } from '@/lib/database';
+import { useAuth } from '@/lib/auth';
 
 import AppButton from '@/components/AppButton';
 
@@ -14,6 +15,7 @@ export default function ScanScreen() {
   const [lastData, setLastData] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     getCurrentStudentId().then(setStudentId);
@@ -41,6 +43,7 @@ export default function ScanScreen() {
   }
 
   const handleBarcodeScanned = ({ data }: { data: string }) => {
+    const studentId = user?.id ?? 'unknown';
     setScanned(true);
     setLastData(data);
     if (!studentId) {

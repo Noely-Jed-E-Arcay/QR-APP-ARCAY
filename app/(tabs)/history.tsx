@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { useAuth } from '@/lib/auth';
 
 import { COLORS } from '@/constants/colors';
 import {
@@ -12,6 +13,7 @@ import {
 export default function HistoryScreen() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   const loadHistory = useCallback(() => {
     setLoading(true);
@@ -21,7 +23,8 @@ export default function HistoryScreen() {
         setLoading(false);
         return;
       }
-      getAttendanceHistory(id).then((rows) => {
+      const studentId = user?.id ?? 'unknown';
+      getAttendanceHistory(studentId).then((rows) => {
         setRecords(rows);
         setLoading(false);
       });
