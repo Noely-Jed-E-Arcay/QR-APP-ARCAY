@@ -9,33 +9,95 @@ import {
   getCurrentStudentId,
   type AttendanceRecord,
 } from '@/lib/database';
+import { getProfile, type Role } from '@/lib/profiles';
+import {
+  getTeacherEventAttendance,
+  type TeacherEventAttendance,
+} from '@/lib/attendance';
 
 export default function HistoryScreen() {
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [role, setRole] = useState<Role | null>(null);
+  const [studentRecords, setStudentRecords] = useState<AttendanceRecord[]>([]);
+  const [teacherEvents, setTeacherEvents] = useState<TeacherEventAttendance[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  const loadHistory = useCallback(() => {
-    const studentId = user?.id ?? 'unknown';
-    setLoading(true);
-    getCurrentStudentId().then((id) => {
-      if (!id) {
-        setRecords([]);
-        setLoading(false);
-        return;
-      }
-      getAttendanceHistory(studentId).then((rows) => {
-        setRecords(rows);
-        setLoading(false);
-      });
-    });
-  }, []);
+  const load = useCallback(async () => {
+  if (!user) { setLoading(false); return; }
+
+  const profile = await getProfile(user.id);
+  const currentRole = profile?.role ?? 'student';
+  setRole(currentRole);
+
+  if (currentRole === 'teacher') {
+    const events = await getTeacherEventAttendance(user.id);
+    setTeacherEvents(events);
+    setStudentRecords([]);
+  } else {
+    const records = await getAttendanceHistory(user.id);
+    setStudentRecords(records);
+    setTeacherEvents([]);
+  }
+
+  setLoading(false);
+}, [user]);
 
   useFocusEffect(
-    useCallback(() => {
-      loadHistory();
-    }, [loadHistory])
-  );
+  useCallback(() => {
+    load();
+  }, [load])
+);
+
+    if (role === 'teacher') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Attendance History</Text>
+
+        {loading ? (
+          <Text style={styles.subtitle}>Loading records...</Text>
+        ) : teacherEvents.length === 0 ? (
+          <Text style={styles.subtitle}>
+            No events created yet.
+          </Text>
+        ) : (
+          <FlatList
+            data={teacherEvents}
+            keyExtractor={(item) => item.eventId}
+            contentContainerStyle={styles.list}
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                <Text style={styles.eventTitle}>{item.title}</Text>
+
+                <Text style={styles.eventMeta}>
+                  Event Code: {item.eventCode}
+                </Text>
+
+                <Text style={styles.eventMeta}>
+                  Start: {item.startTime ? formatDate(item.startTime) : 'N/A'}
+                </Text>
+
+                <Text style={styles.eventMeta}>
+                  End: {item.endTime ? formatDate(item.endTime) : 'N/A'}
+                </Text>
+
+                <Text style={styles.eventMeta}>
+                  Attendees: {item.attendeeCount}
+                </Text>
+
+                {item.attendees.map((attendee) => (
+                  <View key={`${item.eventId}-${attendee.studentId}`}>
+                    <Text style={styles.eventMeta}>
+                      {shortId(attendee.studentId)} - {formatDate(attendee.scannedAt)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          />
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -43,13 +105,13 @@ export default function HistoryScreen() {
 
       {loading ? (
         <Text style={styles.subtitle}>Loading records...</Text>
-      ) : records.length === 0 ? (
+      ) : studentRecords.length === 0 ? (
         <Text style={styles.subtitle}>
           No records yet. Scan a QR code to register your attendance.
         </Text>
       ) : (
         <FlatList
-          data={records}
+          data={studentRecords}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
@@ -67,6 +129,10 @@ export default function HistoryScreen() {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString();
+}
+
+function shortId(id: string) {
+  return id ? `…${id.slice(-8)}` : 'unknown';
 }
 
 const styles = StyleSheet.create({
